@@ -6,7 +6,7 @@ through everything except the pet, its house, the ball and the options menu, and
 your keyboard (except while you type a new name).
 
 ## Install on an Apple Silicon Mac
-1. Double-click `CursorPuppy-1.2.1-mac-apple-silicon.zip`, then drag **Cursor Puppy.app** into **Applications**.
+1. Double-click `CursorPuppy-1.3.0-mac-apple-silicon.zip`, then drag **Cursor Puppy.app** into **Applications**.
 2. The app isn't notarized by Apple, so the first launch needs one extra step:
    right-click the app > **Open** > **Open**. On macOS 15 or newer, if that only offers "Done", open
    **System Settings > Privacy & Security**, scroll down and click **Open Anyway**.
@@ -38,7 +38,7 @@ Needs Node.js 18 or newer.
 cd desktop-app
 npm install
 npm start        # regenerates src/overlay.html from ../cursor-puppy.html, then runs
-npm test         # smoke test: walks the pet through every action, saves test/smoke.png
+npm test         # smoke test on two pretend screens: every action, saves test/smoke-*.png
 ```
 
 ## Build the Mac app
@@ -53,5 +53,6 @@ npm run dist:mac   # on a Mac; output in dist/
 - `src/preload.js`: the small bridge between the window and main.js.
 
 ## Known limits
-- The house lives on your main screen. On a second monitor the pet waits at the edge nearest your cursor.
+- The house lives on your main screen. Your pet follows the cursor onto any other monitor (it walks off
+  the edge and appears on the next screen), and walks back home when you send it to sleep or tie it up.
 - Ad-hoc signed but not notarized, so the first launch needs the extra step above.

@@ -1,4 +1,4 @@
 node_modules/
 dist/
-test/smoke.png
+test/smoke*.png
 .DS_Store

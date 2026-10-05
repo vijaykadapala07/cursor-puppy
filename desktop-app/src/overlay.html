@@ -39,6 +39,7 @@ body {
 }
 html.desktop body { background: transparent; }
 html.desktop .demo-only { display: none !important; }
+[hidden] { display: none !important; }
 
 #world { position: fixed; inset: 0; pointer-events: none; overflow: hidden; }
 .hit { pointer-events: auto; }
@@ -502,6 +503,15 @@ const S = {
   napMs: Number(saved.napMs) || 15000,
 };
 if (!S.name || OLD_NAMES.includes(S.name)) S.name = SPECIES[S.species].name;
+function loadState() { // another screen's window may have changed it
+  try {
+    const v = JSON.parse(localStorage.getItem(KEY)) || {};
+    if (SPECIES[v.species]) S.species = v.species;
+    if (typeof v.name === 'string' && v.name.trim()) S.name = v.name.trim().slice(0, 14);
+    if (['follow', 'ball', 'tied', 'home'].includes(v.mode)) S.mode = v.mode;
+    if (Number(v.napMs)) S.napMs = Number(v.napMs);
+  } catch {}
+}
 function save() {
   try { localStorage.setItem(KEY, JSON.stringify({ species: S.species, name: S.name, mode: S.mode, napMs: S.napMs })); } catch {}
   if (desktop) desktop.report({ species: S.species, name: S.name, mode: S.mode, napMs: S.napMs });
@@ -656,7 +666,7 @@ function clampY(y) { return Math.min(H - 2, Math.max(FEET - 6, y)); }
 
 // walk/run toward (tx,ty); returns remaining distance
 function moveTo(tx, ty, dt, opts = {}) {
-  tx = clampX(tx); ty = clampY(ty);
+  if (!opts.free) { tx = clampX(tx); ty = clampY(ty); }
   const dx = tx - pet.x, dy = ty - pet.y, d = Math.hypot(dx, dy);
   const arrive = opts.arrive ?? 6;
   if (d <= arrive) { pet.speed = 0; return d; }
@@ -691,9 +701,49 @@ function tieZone() {
   return { g, x0: g.ring.x - 30, x1: Math.min(W - 60, g.ring.x + 150), y0: g.ground - 34, y1: Math.min(H - 2, g.ground + 2) };
 }
 
+// ---- several screens (desktop app) ----
+// Each screen has its own window running this page. The pet lives in one of them at a time; when
+// you take the cursor to another screen it walks off this one and the app hands it over.
+let role = { primary: true, home: null }; // home: the house door, in this window's coordinates
+let owner = true;                         // is the pet on this screen?
+function cursorOffScreen() { return !!desktop && (cursor.x < 0 || cursor.x >= W || cursor.y < 0 || cursor.y >= H); }
+function leaveTarget() {
+  if (!role.primary && ['home', 'tied'].includes(S.mode) && role.home) return { x: role.home.x, y: role.home.y, why: 'home' };
+  const dx = cursor.x - pet.x, dy = cursor.y + 54 - pet.y, d = Math.hypot(dx, dy) || 1;
+  return { x: cursor.x + dx / d * 160, y: cursor.y + 54 + dy / d * 160, why: 'cursor' };
+}
+function handOff(why) {
+  owner = false;
+  petEl.classList.add('gone'); bubbleEl.classList.remove('show');
+  ballEl.hidden = true;
+  const carry = S.mode === 'ball';
+  setAct('away');
+  desktop.handoff({ x: pet.x, y: pet.y, why, carry });
+}
+function arrive(a) { // the pet walks in from another screen
+  loadState();
+  owner = true; draw();
+  pet.x = a.x; pet.y = a.y; pet.speed = 300; pet.arrived = false;
+  petEl.classList.remove('gone', 'entering');
+  if (S.mode === 'ball') { ball.active = true; ball.held = true; ballEl.hidden = true; petEl.dataset.carry = '1'; setAct('fetch'); }
+  else if (S.mode === 'home') setAct('toHome');
+  else if (S.mode === 'tied') setAct('toTie');
+  else setAct('follow');
+  render();
+}
+
 function update(dt, now) {
   pet.t += dt;
+  if (desktop && (((pet.act === 'follow' || pet.act === 'fetch') && cursorOffScreen()) || (!role.primary && ['toHome', 'toTie', 'pace'].includes(pet.act)))) setAct('leave');
   switch (pet.act) {
+    case 'leave': { // walk off the edge toward the other screen
+      const t = leaveTarget();
+      if (t.why === 'cursor' && !cursorOffScreen()) { setAct(ball.held ? 'fetch' : 'follow'); break; }
+      moveTo(t.x, t.y, dt, { free: true, run: true });
+      if (pet.x < -PW / 2 || pet.x > W + PW / 2 || pet.y < 10 || pet.y > H + FEET) handOff(t.why);
+      break;
+    }
+    case 'away': break;
     case 'follow': {
       const t = followTarget();
       const d = Math.hypot(clampX(t.x) - pet.x, clampY(t.y) - pet.y);
@@ -838,6 +888,7 @@ menuEl.addEventListener('click', (e) => {
   if (pick) switchPet(pick.dataset.species);
 });
 function doAction(a) {
+  if (desktop && !owner) { desktop.forward({ type: 'act', value: a }); return; }
   if (a === 'call') setMode('follow');
   if (a === 'ball') setMode('ball');
   if (a === 'tie') setMode('tied');
@@ -848,6 +899,7 @@ function switchPet(k) {
   if (S.name === SPECIES[S.species].name) S.name = SPECIES[k].name; // keep custom names
   S.species = k; save(); draw();
   if (pet.act === 'inside') { houseEl.dataset.home = 'in'; houseEl.dataset.peek = 'sleep'; }
+  if (!owner) return;
   petEl.classList.remove('pop'); void petEl.offsetWidth; petEl.classList.add('pop');
   if (pet.act !== 'inside') say(`Hi, I'm ${S.name}!`);
 }
@@ -905,28 +957,48 @@ if (desktop) desktop.onAction((a) => {
   if (a.type === 'rename') { openMenu(true); setTimeout(() => { nameInput.focus(); nameInput.select(); }, 60); }
 });
 
+if (desktop) {
+  desktop.onArrive(arrive);
+  desktop.onSync((v) => {
+    const redraw = v.species !== S.species || v.name !== S.name;
+    Object.assign(S, { species: v.species, name: v.name, mode: v.mode, napMs: v.napMs });
+    if (redraw) draw();
+    if (role.primary && !owner) { houseEl.dataset.home = 'out'; }
+  });
+}
+
 // ================= loop =================
 function resize() { W = innerWidth; H = innerHeight; }
 addEventListener('resize', resize);
 let last = performance.now();
 function frame(now) {
   const dt = Math.min(.05, (now - last) / 1000); last = now;
-  update(dt, now);
-  if (pet.act !== 'inside') render();
-  renderBall(); renderLeash();
+  if (owner) {
+    update(dt, now);
+    if (pet.act !== 'inside') render();
+    renderBall();
+  }
+  renderLeash();
   requestAnimationFrame(frame);
 }
 
-draw();
-{ // first appearance: home if they were left asleep, otherwise trot out of the house
-  const g = houseGeo();
-  pet.x = g.door.x; pet.y = g.door.y + 2;
-  if (S.mode === 'home') { petEl.classList.add('gone'); houseEl.dataset.home = 'in'; houseEl.dataset.peek = 'sleep'; setAct('inside'); }
-  else { houseEl.dataset.home = 'in'; houseEl.dataset.peek = 'awake'; petEl.classList.add('gone'); setAct('inside'); setTimeout(() => leaveHouse(S.mode), 700); }
+function boot(r) {
+  role = { ...role, ...r };
+  draw();
+  if (!role.primary) { // another screen: no house here, and the pet starts at home on the main screen
+    owner = false; houseEl.hidden = true; menuEl.hidden = true;
+    petEl.classList.add('gone'); setAct('away');
+  } else { // first appearance: home if they were left asleep, otherwise trot out of the house
+    const g = houseGeo();
+    pet.x = g.door.x; pet.y = g.door.y + 2;
+    if (S.mode === 'home') { petEl.classList.add('gone'); houseEl.dataset.home = 'in'; houseEl.dataset.peek = 'sleep'; setAct('inside'); }
+    else { houseEl.dataset.home = 'in'; houseEl.dataset.peek = 'awake'; petEl.classList.add('gone'); setAct('inside'); setTimeout(() => leaveHouse(S.mode), 700); }
+    save();
+  }
+  requestAnimationFrame(frame);
 }
-save();
-window.cursorPuppy = { petSVG, faceSVG, SPECIES, S, pet, ball, cursor, setMode, switchPet, openMenu };
-requestAnimationFrame(frame);
+window.cursorPuppy = { petSVG, faceSVG, SPECIES, S, pet, ball, cursor, setMode, switchPet, openMenu, get owner() { return owner; }, get role() { return role; } };
+if (desktop) desktop.onSetup(boot); else boot({ primary: true });
 })();
 </script>
 
