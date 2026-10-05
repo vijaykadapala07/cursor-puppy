@@ -1,0 +1,31 @@
+{
+  "name": "cursor-puppy",
+  "productName": "Cursor Puppy",
+  "version": "1.2.1",
+  "description": "A tiny pet that follows your cursor and lives in a little house at the bottom-left of your screen.",
+  "main": "src/main.js",
+  "author": "Vijay",
+  "license": "MIT",
+  "scripts": {
+    "start": "electron .",
+    "sync": "node scripts/sync.js",
+    "prestart": "node scripts/sync.js || true",
+    "test": "electron test/smoke.js",
+    "dist:mac": "electron-builder --mac"
+  },
+  "build": {
+    "appId": "com.vijay.cursorpuppy",
+    "productName": "Cursor Puppy",
+    "files": ["src/**/*", "assets/**/*", "package.json"],
+    "mac": {
+      "target": "zip",
+      "icon": "assets/icon.png",
+      "category": "public.app-category.entertainment"
+    },
+    "linux": { "target": "dir", "icon": "assets/icon.png" }
+  },
+  "devDependencies": {
+    "electron": "^44.5.1",
+    "electron-builder": "^26.0.0"
+  }
+}
