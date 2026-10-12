@@ -20,9 +20,9 @@ jobs:
     env:
       TAG: ${{ github.event.inputs.tag || github.ref_name }}
     steps:
+      # A tag push checks out that tag; a manual run builds the branch it was started from
+      # and creates the tag there.
       - uses: actions/checkout@v4
-        with:
-          ref: ${{ env.TAG }}
 
       - uses: actions/setup-node@v4
         with:
@@ -45,11 +45,13 @@ jobs:
           codesign --verify --deep "$APP"
           ditto -c -k --keepParent "$APP" "dist/CursorPuppy-$VERSION-mac-apple-silicon.zip"
           ls -lh dist/*.zip
+          echo "VERSION=$VERSION" >> "$GITHUB_ENV"
 
       - name: Publish the release
         uses: softprops/action-gh-release@v2
         with:
           tag_name: ${{ env.TAG }}
-          name: Cursor Puppy ${{ env.TAG }}
+          target_commitish: ${{ github.sha }}
+          name: Cursor Puppy ${{ env.VERSION }}
           body_path: .github/release-notes.md
           files: desktop-app/dist/*.zip
