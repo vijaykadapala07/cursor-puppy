@@ -1,0 +1,55 @@
+# Builds the Apple Silicon Mac app and publishes it as a GitHub Release.
+# Runs when a version tag like v1.3.0 is pushed, or by hand from the Actions tab.
+name: Release Mac app
+
+on:
+  push:
+    tags: ['v*']
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: 'Tag to publish, e.g. v1.3.0'
+        required: true
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    runs-on: macos-14
+    env:
+      TAG: ${{ github.event.inputs.tag || github.ref_name }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ env.TAG }}
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+
+      - name: Build the app
+        working-directory: desktop-app
+        env:
+          CSC_IDENTITY_AUTO_DISCOVERY: 'false'
+        run: |
+          npm install
+          npx electron-builder --mac dir --arm64
+
+      - name: Ad-hoc sign and zip
+        working-directory: desktop-app
+        run: |
+          VERSION=$(node -p "require('./package.json').version")
+          APP="dist/mac-arm64/Cursor Puppy.app"
+          codesign --force --deep --sign - "$APP"
+          codesign --verify --deep "$APP"
+          ditto -c -k --keepParent "$APP" "dist/CursorPuppy-$VERSION-mac-apple-silicon.zip"
+          ls -lh dist/*.zip
+
+      - name: Publish the release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ env.TAG }}
+          name: Cursor Puppy ${{ env.TAG }}
+          body_path: .github/release-notes.md
+          files: desktop-app/dist/*.zip
