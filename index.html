@@ -1,0 +1,997 @@
+<title>Cursor Puppy</title>
+<!--FONTS-->
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Baloo+2:wght@600;800&display=swap">
+<!--/FONTS-->
+<style>
+/* Layout: the whole page is "the screen"; a house sits bottom-left, the pet roams anywhere. */
+:root {
+  --ink: #2A1E1A;
+  --paper: #FFFDF8;
+  --wall: #F7C873;
+  --wall-line: #D9A24E;
+  --roof: #EE5F57;
+  --roof-dark: #C8433D;
+  --wood: #B97A3A;
+  --door: #3B2B33;
+  --accent: #FF7A59;
+  --grass: #7CC86B;
+  --wall1: #CFE8F7;
+  --wall2: #FFE6D3;
+  --font: 'Baloo 2', 'Avenir Next Rounded', 'Avenir Next', 'Trebuchet MS', system-ui, sans-serif;
+  color-scheme: light;
+}
+html, body { height: 100%; margin: 0; overflow: hidden; }
+body {
+  font-family: var(--font);
+  color: var(--ink);
+  background:
+    radial-gradient(circle at 1px 1px, rgba(42, 30, 26, .07) 1px, transparent 0) 0 0 / 22px 22px,
+    linear-gradient(160deg, var(--wall1), var(--wall2));
+  user-select: none;
+  -webkit-user-select: none;
+}
+html.desktop body { background: transparent; }
+html.desktop .demo-only { display: none !important; }
+[hidden] { display: none !important; }
+
+#world { position: fixed; inset: 0; pointer-events: none; overflow: hidden; }
+.hit { pointer-events: auto; }
+
+/* ---------- house ---------- */
+#house { position: absolute; left: 18px; bottom: 6px; width: 190px; z-index: 3; cursor: pointer; }
+#house svg { display: block; width: 100%; height: auto; overflow: visible; }
+#house svg * { transform-box: view-box; }
+#house .house-body { pointer-events: visiblePainted; }
+#house:hover .house-art { transform: translateY(-2px); }
+.house-art { transition: transform .2s; transform-origin: 90px 146px; }
+#house.boop .house-art { animation: boop .35s; }
+@keyframes boop { 40% { transform: scale(1.06, .94); } 70% { transform: scale(.97, 1.04); } }
+.nameplate-text { font: 800 13px var(--font); fill: var(--ink); }
+.peek { transform: translateY(66px); transition: transform .55s cubic-bezier(.3, 1.4, .5, 1); }
+#house[data-home="in"] .peek { transform: translateY(0); }
+.peek .p-eyes-closed, .peek .p-tongue { display: none; }
+.peek-paws { opacity: 0; transition: opacity .2s .35s; }
+#house[data-home="in"] .peek-paws { opacity: 1; }
+#house[data-peek="sleep"] .peek .p-eyes { display: none; }
+#house[data-peek="sleep"] .peek .p-eyes-closed { display: inline; }
+#house[data-peek="sleep"] .peek-head { animation: peekBreath 3s ease-in-out infinite; }
+@keyframes peekBreath { 50% { transform: translateY(1.5px) rotate(-3deg); } }
+.peek-head { transform-origin: 82px 66px; }
+.house-zzz { opacity: 0; }
+#house[data-peek="sleep"] .house-zzz { opacity: 1; }
+.house-zzz text, .p-zzz text { font: 800 14px var(--font); fill: #6B8FD6; stroke: var(--paper); stroke-width: 3; paint-order: stroke; opacity: 0; }
+#house[data-peek="sleep"] .house-zzz text,
+.pet[data-pose="sleep"] .p-zzz text { animation: zzz 2.4s ease-out infinite; }
+.house-zzz text:nth-child(2), .p-zzz text:nth-child(2) { animation-delay: .8s !important; }
+.house-zzz text:nth-child(3), .p-zzz text:nth-child(3) { animation-delay: 1.6s !important; }
+@keyframes zzz { 0% { opacity: 0; transform: translate(0, 6px) scale(.6); } 25% { opacity: 1; } 100% { opacity: 0; transform: translate(10px, -16px) scale(1.15); } }
+.post-ring { transition: stroke .2s; }
+
+/* ---------- menu ---------- */
+#menu {
+  position: absolute; left: 14px; bottom: 182px; width: 272px; z-index: 20;
+  background: var(--paper); border: 3px solid var(--ink); border-radius: 20px;
+  box-shadow: 0 6px 0 rgba(42, 30, 26, .9), 0 18px 40px rgba(42, 30, 26, .18);
+  padding: 12px; display: grid; gap: 10px;
+  transform-origin: 70px calc(100% + 20px);
+  animation: menuIn .28s cubic-bezier(.3, 1.5, .5, 1);
+}
+#menu[hidden] { display: none !important; }
+#menu::after {
+  content: ""; position: absolute; left: 58px; bottom: -14px; width: 22px; height: 22px;
+  background: var(--paper); border-right: 3px solid var(--ink); border-bottom: 3px solid var(--ink);
+  transform: rotate(45deg); border-radius: 0 0 6px 0;
+}
+@keyframes menuIn { from { transform: scale(.6) translateY(20px); opacity: 0; } }
+.menu-head { display: flex; align-items: center; gap: 10px; }
+.menu-head svg { width: 44px; height: 44px; flex: none; }
+.menu-name { font-weight: 800; font-size: 20px; line-height: 1; }
+.menu-mode { font-weight: 600; font-size: 13px; opacity: .65; line-height: 1.2; margin-top: 2px; }
+.acts { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 6px; }
+.act {
+  font: 800 14px/1.1 var(--font); color: var(--ink); text-align: left;
+  display: flex; align-items: center; gap: 6px;
+  padding: 8px 9px; border: 2.5px solid var(--ink); border-radius: 13px;
+  background: #FFF1DE; cursor: pointer; box-shadow: 0 3px 0 var(--ink); min-width: 0;
+  transition: transform .08s, box-shadow .08s, background .15s;
+}
+.act:hover { background: #FFE1BF; }
+.act:active { transform: translateY(3px); box-shadow: 0 0 0 var(--ink); }
+.act:focus-visible, .pick:focus-visible, .rename button:focus-visible, .rename input:focus-visible { outline: 3px solid var(--accent); outline-offset: 2px; }
+.act[aria-pressed="true"] { background: #FFD08A; }
+.act .ico { font-size: 17px; line-height: 1; }
+.menu-label { font-weight: 800; font-size: 12px; letter-spacing: .08em; text-transform: uppercase; opacity: .55; margin-bottom: -4px; }
+.picks { display: grid; grid-template-columns: repeat(3, 1fr); gap: 6px; }
+.pick {
+  font: 700 12px/1 var(--font); color: var(--ink); background: transparent;
+  border: 2.5px solid transparent; border-radius: 14px; padding: 4px 2px 6px; cursor: pointer;
+  display: grid; justify-items: center; gap: 2px;
+}
+.pick svg { width: 46px; height: 46px; }
+.pick:hover { background: #FFF1DE; }
+.pick[aria-pressed="true"] { border-color: var(--ink); background: #FFF1DE; }
+.rename { display: flex; gap: 6px; }
+.rename input {
+  min-width: 0; flex: 1; font: 700 15px var(--font); color: var(--ink);
+  border: 2.5px solid var(--ink); border-radius: 12px; padding: 4px 9px; background: #fff;
+}
+.rename button {
+  font: 800 14px var(--font); border: 2.5px solid var(--ink); border-radius: 12px;
+  background: var(--accent); color: #fff; padding: 4px 12px; cursor: pointer; box-shadow: 0 3px 0 var(--ink);
+}
+.rename button:active { transform: translateY(3px); box-shadow: none; }
+
+/* ---------- pet ---------- */
+.pet { position: absolute; left: 0; top: 0; width: 120px; z-index: 5; will-change: transform; }
+.pet-flip { transition: transform .14s; }
+.pet svg { display: block; width: 120px; height: auto; overflow: visible; filter: drop-shadow(0 0 .7px rgba(110, 80, 45, .6)); }
+.pet svg * { transform-box: view-box; }
+.pet .p-all { pointer-events: visiblePainted; cursor: grab; }
+.pet.entering { transition: opacity .45s, filter .45s; opacity: 0; }
+.pet.entering .pet-flip { transform: scale(.55) translateY(-6px) !important; transition: transform .45s; }
+.pet.gone { visibility: hidden; }
+.pet.pop .pet-pop { animation: pop .45s cubic-bezier(.3, 1.6, .5, 1); }
+.pet-pop { transform-origin: 60px 100%; }
+@keyframes pop { from { transform: scale(.3); } }
+
+.p-eyes-closed, .p-tongue, .p-carry, .p-zzz, .p-alert, .p-haunch { display: none; }
+.pet[data-pose="sit"] .p-haunch, .pet[data-pose="drowsy"] .p-haunch, .pet[data-pose="sleep"] .p-haunch { display: inline; }
+.pet[data-pose="sit"] .p-leg-back, .pet[data-pose="drowsy"] .p-leg-back, .pet[data-pose="sleep"] .p-leg-back { display: none; }
+.p-haunch { transform-origin: 41px 92px; }
+.pet[data-pose="sleep"] .p-haunch { transform: translate(2px, 4px) scale(1.05, .78); }
+.p-eyes { transform-origin: 91px 42px; animation: blink 4.2s infinite; }
+@keyframes blink { 0%, 95%, 100% { transform: scaleY(1); } 97% { transform: scaleY(.1); } }
+.p-tail { animation: wag .5s ease-in-out infinite alternate; }
+@keyframes wag { from { transform: rotate(-10deg); } to { transform: rotate(12deg); } }
+.pet[data-species="panda"] .p-tail, .pet[data-species="teddy"] .p-tail { animation: none; }
+.p-head { transform-origin: 80px 62px; transition: transform .3s; }
+.p-torso { transform-origin: 34px 86px; transition: transform .3s; }
+.p-leg { transition: transform .25s; }
+.p-all { transform-origin: 56px 95px; }
+
+/* walk + run: diagonal leg pairs swing together */
+.pet { --step: .44s; --amp: 22deg; --bob: 2.5px; }
+.pet[data-pose="run"] { --step: .26s; --amp: 36deg; --bob: 5px; }
+.pet[data-pose="walk"] .p-leg-a, .pet[data-pose="run"] .p-leg-a { animation: swingA var(--step) ease-in-out infinite; }
+.pet[data-pose="walk"] .p-leg-b, .pet[data-pose="run"] .p-leg-b { animation: swingB var(--step) ease-in-out infinite; }
+.pet[data-pose="walk"] .p-all, .pet[data-pose="run"] .p-all { animation: bob calc(var(--step) / 2) ease-in-out infinite alternate; }
+.pet[data-pose="walk"] .p-head, .pet[data-pose="run"] .p-head { animation: nod var(--step) ease-in-out infinite; }
+.pet[data-pose="run"] .p-tail { animation-duration: .18s; }
+.pet[data-pose="run"] .p-tongue { display: inline; }
+.pet[data-pose="run"] .p-ear { animation: flap var(--step) ease-in-out infinite; }
+@keyframes swingA { 0%, 100% { transform: rotate(var(--amp)); } 50% { transform: rotate(calc(var(--amp) * -1)); } }
+@keyframes swingB { 0%, 100% { transform: rotate(calc(var(--amp) * -1)); } 50% { transform: rotate(var(--amp)); } }
+@keyframes bob { from { transform: translateY(0); } to { transform: translateY(calc(var(--bob) * -1)); } }
+@keyframes nod { 0%, 100% { transform: rotate(-2deg); } 50% { transform: rotate(3deg) translateY(1px); } }
+@keyframes flap { 0%, 100% { transform: rotate(-8deg); } 50% { transform: rotate(14deg); } }
+
+/* panda waddles, teddy toddles */
+.pet[data-species="panda"][data-pose="walk"] { --step: .56s; --amp: 16deg; }
+.pet[data-species="panda"][data-pose="run"] { --step: .34s; --amp: 26deg; }
+.pet[data-species="teddy"][data-pose="walk"] { --step: .5s; --amp: 14deg; }
+.pet[data-species="teddy"][data-pose="run"] { --step: .3s; --amp: 24deg; }
+.pet[data-species="panda"][data-pose="walk"] .p-torso, .pet[data-species="panda"][data-pose="run"] .p-torso,
+.pet[data-species="teddy"][data-pose="walk"] .p-torso, .pet[data-species="teddy"][data-pose="run"] .p-torso { transform-origin: 53px 86px; animation: waddle var(--step) ease-in-out infinite; }
+@keyframes waddle { 0%, 100% { transform: rotate(-3deg); } 50% { transform: rotate(3deg); } }
+.pet[data-species="morkie"][data-pose="walk"] { --step: .36s; --amp: 20deg; }
+.pet[data-species="morkie"][data-pose="run"] { --step: .22s; }
+.p-ear-twitch { transform-origin: 78px 24px; animation: twitch 5s infinite; }
+@keyframes twitch { 0%, 88%, 100% { transform: rotate(0); } 91% { transform: rotate(-12deg); } 94% { transform: rotate(4deg); } }
+.p-nose { transform-origin: 101px 49px; animation: sniff 1.4s infinite; }
+@keyframes sniff { 0%, 60%, 100% { transform: scale(1); } 70% { transform: scale(1.25, .85); } 80% { transform: scale(1); } 90% { transform: scale(1.2, .9); } }
+
+/* sit */
+.pet[data-pose="sit"] .p-torso { transform: rotate(-20deg); }
+.pet[data-pose="sit"] .p-leg-back { transform: translate(6px, 13px) scaleY(.5); }
+.pet[data-pose="sit"] .p-head { transform: translate(-4px, -3px); }
+.pet[data-pose="sit"] .p-tail { transform-origin: 30px 66px; }
+
+/* sleep: lie down, paws forward, chin on paws */
+.pet[data-pose="sleep"] .p-all { transform: translateY(4px); }
+.pet[data-pose="sleep"] .p-torso { transform: translateY(9px) scale(1.06, .82); animation: breathe 3.2s ease-in-out infinite; }
+.pet[data-pose="sleep"] .p-leg-front { transform: translate(8px, 19px) rotate(-82deg); }
+.pet[data-pose="sleep"] .p-leg-back { transform: translate(4px, 16px) scaleY(.38); }
+.pet[data-pose="sleep"] .p-head { transform: translate(6px, 18px) rotate(10deg); }
+.pet[data-pose="sleep"] .p-tail { animation: none; transform: translate(4px, 14px) rotate(-62deg); }
+.pet[data-species="panda"][data-pose="sleep"] .p-tail, .pet[data-species="teddy"][data-pose="sleep"] .p-tail { transform: translate(4px, 12px); }
+.pet[data-pose="sleep"] .p-eyes, .pet[data-pose="drowsy"] .p-eyes { display: none; }
+.pet[data-pose="sleep"] .p-eyes-closed, .pet[data-pose="drowsy"] .p-eyes-closed, .pet[data-pose="sleep"] .p-zzz { display: inline; }
+.pet[data-pose="sleep"] .p-shadow { transform: scaleX(1.12); transform-origin: 56px 95px; }
+@keyframes breathe { 0%, 100% { transform: translateY(9px) scale(1.06, .82); } 50% { transform: translateY(8px) scale(1.08, .87); } }
+.pet[data-pose="drowsy"] .p-torso { transform: rotate(-20deg); }
+.pet[data-pose="drowsy"] .p-leg-back { transform: translate(6px, 13px) scaleY(.5); }
+.pet[data-pose="drowsy"] .p-head { transform: translate(-3px, 2px) rotate(8deg); }
+
+/* happy wiggle when you click them */
+.pet.happy .p-all { animation: wiggle .5s ease-in-out 2 !important; }
+.pet.happy .p-eyes { display: none; }
+.pet.happy .p-eyes-closed, .pet.happy .p-tongue { display: inline; }
+@keyframes wiggle { 25% { transform: rotate(-6deg) translateY(-6px); } 75% { transform: rotate(6deg) translateY(-6px); } }
+.pet.startle .p-all { animation: startle .4s ease-out !important; }
+.pet.startle .p-alert { display: inline; }
+@keyframes startle { 40% { transform: translateY(-14px) scale(.95, 1.06); } }
+.pet[data-carry="1"] .p-carry { display: inline; }
+.pet[data-carry="1"] .p-tongue { display: none !important; }
+
+/* bubble above the pet */
+.bubble {
+  position: absolute; left: 50%; bottom: calc(100% - 6px); transform: translateX(-50%);
+  white-space: nowrap; font: 800 15px/1 var(--font); color: var(--ink);
+  background: var(--paper); border: 2.5px solid var(--ink); border-radius: 14px; padding: 6px 10px 5px;
+  box-shadow: 0 3px 0 var(--ink); opacity: 0; transition: opacity .2s, transform .25s; pointer-events: none;
+}
+.bubble.show { opacity: 1; transform: translateX(-50%) translateY(-6px); }
+.heart { position: absolute; font-size: 18px; pointer-events: none; animation: heart 1s ease-out forwards; z-index: 9; }
+@keyframes heart { from { opacity: 1; transform: translate(0, 0) scale(.6); } to { opacity: 0; transform: translate(var(--dx), -60px) scale(1.2); } }
+
+/* ball */
+#ball { position: absolute; left: 0; top: 0; width: 30px; height: 30px; z-index: 6; cursor: grab; touch-action: none; }
+#ball[hidden] { display: none; }
+#ball .b { position: absolute; inset: 0; }
+#ball .b svg { width: 100%; height: 100%; display: block; }
+#ball .shadow { position: absolute; left: 3px; right: 3px; top: 26px; height: 7px; border-radius: 50%; background: rgba(42, 30, 26, .18); }
+#leash { position: absolute; inset: 0; width: 100%; height: 100%; z-index: 4; overflow: visible; }
+
+/* demo-only tip card */
+.tips {
+  position: fixed; top: 16px; right: 16px; width: min(300px, calc(100vw - 32px)); z-index: 30;
+  background: var(--paper); border: 3px solid var(--ink); border-radius: 20px; padding: 14px 16px 12px;
+  box-shadow: 0 5px 0 var(--ink); pointer-events: auto;
+}
+.tips h1 { margin: 0; font-weight: 800; font-size: 26px; line-height: 1; letter-spacing: -.01em; }
+.tips p { margin: 6px 0 0; font-weight: 600; font-size: 14px; line-height: 1.35; }
+.tips .row { display: flex; align-items: center; justify-content: space-between; gap: 8px; margin-top: 10px; }
+.tips label { font-weight: 700; font-size: 13px; display: flex; align-items: center; gap: 6px; }
+.tips select { font: 700 13px var(--font); border: 2px solid var(--ink); border-radius: 10px; padding: 1px 4px; background: #fff; color: var(--ink); }
+.tips button.x { font: 800 13px var(--font); border: 2px solid var(--ink); border-radius: 10px; background: #FFF1DE; padding: 2px 10px; cursor: pointer; color: var(--ink); }
+.tips.min p, .tips.min .row label { display: none; }
+.tips.min { width: auto; }
+.tips.min .row { margin-top: 6px; }
+@media (max-width: 520px) { .tips { top: 10px; right: 10px; left: 10px; width: auto; } }
+@media (prefers-reduced-motion: reduce) { *, *::before, *::after { animation-duration: 1ms !important; animation-iteration-count: 1 !important; transition-duration: 1ms !important; } }
+</style>
+
+<div id="world">
+  <svg id="leash" aria-hidden="true"><path id="leash-path" fill="none" stroke="#C8433D" stroke-width="4" stroke-linecap="round"/><path id="leash-hi" fill="none" stroke="#FF9A8F" stroke-width="1.5" stroke-linecap="round" stroke-dasharray="3 6"/></svg>
+
+  <div id="house" class="hit" role="button" tabindex="0" aria-label="Pet house. Click for options" aria-haspopup="true" aria-expanded="false"></div>
+
+  <div id="pet" class="pet" aria-hidden="true">
+    <div class="bubble" id="bubble"></div>
+    <div class="pet-pop"><div class="pet-flip" id="pet-flip"></div></div>
+  </div>
+
+  <div id="ball" class="hit" hidden aria-label="Ball. Click or drag to throw"><div class="shadow"></div><div class="b" id="ball-art"></div></div>
+
+  <div id="menu" class="hit" role="menu" hidden>
+    <div class="menu-head"><span id="menu-face"></span><div><div class="menu-name" id="menu-name"></div><div class="menu-mode" id="menu-mode"></div></div></div>
+    <div class="acts">
+      <button class="act" data-act="call"><span class="ico">📣</span><span id="call-label">Call</span></button>
+      <button class="act" data-act="ball"><span class="ico">🎾</span>Play ball</button>
+      <button class="act" data-act="tie"><span class="ico">🪢</span>Tie at home</button>
+      <button class="act" data-act="sleep"><span class="ico">🌙</span>Bedtime</button>
+    </div>
+    <div class="menu-label">Switch pet</div>
+    <div class="picks" id="picks"></div>
+    <div class="menu-label">Name</div>
+    <form class="rename" id="rename"><input id="name-input" maxlength="14" autocomplete="off" spellcheck="false" aria-label="Pet name"><button type="submit">Save</button></form>
+  </div>
+</div>
+
+<div class="tips demo-only" id="tips">
+  <h1>Cursor Puppy</h1>
+  <p>Move your mouse and your pet trots after it. Pick a Morkie, a panda or a teddy. Click the little house for options. Leave the mouse still and they curl up for a nap right there.</p>
+  <div class="row">
+    <label for="nap-select">Nap after
+      <select id="nap-select"><option value="5000">5 s</option><option value="15000" selected>15 s</option><option value="30000">30 s</option><option value="60000">1 min</option></select>
+    </label>
+    <button class="x" id="tips-toggle" type="button">Hide tips</button>
+  </div>
+</div>
+
+<script>
+(() => {
+'use strict';
+const desktop = window.desktop || null;
+if (desktop) document.documentElement.classList.add('desktop');
+const INK = '#2A1E1A';
+const SW = 2.6; // outline width for the house and ball
+
+// ================= art =================
+// Pets are painted, not outlined: each body part is a soft shaded blob covered in little curls,
+// with a fluffy curl-bumped silhouette. Everything is generated from a seeded random so it's stable.
+const SPECIES = {
+  morkie: { label: 'Morkie', name: 'Snowy', sound: 'Yip!', curl: 3.1, fur: '#F4E7CF', hi: '#FFF9EE', shade: '#D9C29C', deep: '#B5966B', ear: '#E6CFA6', earShade: '#C9A97A', belly: '#FBF2E2', collar: '#F07B98' },
+  panda: { label: 'Panda', name: 'Bao', sound: 'Nom nom!', curl: 2.3, fur: '#F5F3EE', hi: '#FFFFFF', shade: '#D6D2C8', deep: '#A9A49A', dark: '#2E2B2F', darkHi: '#56515A', darkShade: '#1B191C', belly: '#FFFFFF', collar: '#62B85F' },
+  teddy: { label: 'Teddy', name: 'Honey', sound: 'Hug me!', curl: 1.8, fur: '#C68E5C', hi: '#E2B07E', shade: '#9A6738', deep: '#7A4E28', ear: '#EED6AE', earShade: '#D2B385', belly: '#EED6AE', collar: '#E5484D' },
+};
+const OLD_NAMES = ['Biscuit', 'Mochi', 'Clover'];
+const LINE = '#3B2D27';
+const o = `stroke="${INK}" stroke-width="${SW}" stroke-linejoin="round" stroke-linecap="round"`;
+const ol = `stroke="${LINE}" stroke-width="1.4" stroke-linejoin="round" stroke-linecap="round" stroke-opacity=".55"`;
+const f1 = (n) => Math.round(n * 10) / 10;
+let UID = 0, CUR = '';
+const begin = (k) => { CUR = `${k}-${++UID}`; };
+
+function rng(seed) { // mulberry32
+  let a = seed >>> 0;
+  return () => { a = (a + 0x6D2B79F5) >>> 0; let t = a; t = Math.imul(t ^ (t >>> 15), t | 1); t ^= t + Math.imul(t ^ (t >>> 7), t | 61); return ((t ^ (t >>> 14)) >>> 0) / 4294967296; };
+}
+function hex(c) { const n = parseInt(c.slice(1), 16); return [n >> 16, (n >> 8) & 255, n & 255]; }
+function mix(a, b, t) { t = Math.max(0, Math.min(1, t)); const A = hex(a), B = hex(b); return '#' + A.map((v, i) => Math.round(v + (B[i] - v) * t).toString(16).padStart(2, '0')).join(''); }
+
+// One furry part: an ellipse at (cx,cy) with radii rx,ry, rotated by rot degrees.
+// pal = { hi, base, shade, deep }, curl = curl radius, opts.edge=false skips the bumpy rim.
+function part(cx, cy, rx, ry, pal, curl, opts = {}) {
+  const R = rng(Math.round(cx * 131 + cy * 977 + rx * 37 + ry * 11 + (opts.seed || 0)));
+  const tone = (x, y) => { // light from the upper left
+    const t = ((y - cy) / ry * .65 + (x - cx) / rx * .35 + 1) / 2;
+    return t < .5 ? mix(pal.hi, pal.base, t * 2) : mix(pal.base, pal.shade, (t - .5) * 2);
+  };
+  const id = `pg-${CUR}-${Math.round(cx)}-${Math.round(cy)}-${Math.round(rx)}`;
+  let s = `<radialGradient id="${id}" cx="35%" cy="28%" r="78%"><stop offset="0" stop-color="${pal.hi}"/><stop offset=".55" stop-color="${pal.base}"/><stop offset="1" stop-color="${pal.shade}"/></radialGradient>`;
+  s += `<ellipse cx="${f1(cx)}" cy="${f1(cy)}" rx="${f1(rx)}" ry="${f1(ry)}" fill="url(#${id})"/>`;
+  if (opts.edge !== false) { // fluffy rim: overlapping curls just inside the outline
+    const per = Math.PI * (3 * (rx + ry) - Math.sqrt((3 * rx + ry) * (rx + 3 * ry)));
+    const m = Math.max(8, Math.round(per / (curl * 1.35)));
+    for (let i = 0; i < m; i++) {
+      const a = (i + R() * .5) / m * Math.PI * 2, r = curl * (.85 + R() * .45);
+      const x = cx + (rx - r * .35) * Math.cos(a), y = cy + (ry - r * .35) * Math.sin(a);
+      s += `<circle cx="${f1(x)}" cy="${f1(y)}" r="${f1(r)}" fill="${tone(x, y)}" stroke="${pal.deep}" stroke-width=".55" stroke-opacity="${f1(.15 + Math.max(0, Math.sin(a)) * .4)}"/>`;
+    }
+  }
+  // curls across the surface
+  const n = Math.round(Math.PI * rx * ry / (curl * curl * (opts.sparse ? 9 : 4.6)));
+  for (let i = 0; i < n; i++) {
+    let x, y, tries = 0;
+    do { x = cx + (R() * 2 - 1) * rx; y = cy + (R() * 2 - 1) * ry; tries++; } while (((x - cx) / rx) ** 2 + ((y - cy) / ry) ** 2 > .8 && tries < 20);
+    const r = curl * (.55 + R() * .5), a0 = R() * 6.28, sweep = 3.6 + R() * 1.6;
+    const x0 = x + r * Math.cos(a0), y0 = y + r * Math.sin(a0), x1 = x + r * Math.cos(a0 + sweep), y1 = y + r * Math.sin(a0 + sweep);
+    const c = tone(x, y);
+    s += `<circle cx="${f1(x)}" cy="${f1(y)}" r="${f1(r * 1.05)}" fill="${mix(c, pal.hi, .35)}" opacity=".4"/>`;
+    s += `<path d="M${f1(x0)} ${f1(y0)} A${f1(r)} ${f1(r)} 0 1 1 ${f1(x1)} ${f1(y1)}" fill="none" stroke="${mix(c, pal.deep, .55)}" stroke-width="${f1(curl * .26)}" stroke-linecap="round" opacity="${f1(.25 + R() * .28)}"/>`;
+  }
+  return opts.rot ? `<g transform="rotate(${opts.rot} ${f1(cx)} ${f1(cy)})">${s}</g>` : s;
+}
+const palFur = (s) => ({ hi: s.hi, base: s.fur, shade: s.shade, deep: s.deep });
+const palDark = (s) => ({ hi: s.darkHi, base: s.dark, shade: s.darkShade, deep: '#0E0D0F' });
+const palEar = (s) => ({ hi: s.ear, base: mix(s.ear, s.earShade, .4), shade: s.earShade, deep: s.deep });
+const palBelly = (s) => ({ hi: '#FFFFFF', base: s.belly, shade: mix(s.belly, s.shade, .5), deep: s.deep });
+const palLeg = (s, near) => s.dark ? (near ? palDark(s) : { ...palDark(s), hi: s.dark, base: s.darkShade }) : (near ? palFur(s) : { hi: s.fur, base: s.shade, shade: s.deep, deep: s.deep });
+
+function defs() { return ''; }
+function leg(x, s, cls, near) {
+  const p = palLeg(s, near), c = s.curl * .85;
+  return `<g class="p-leg ${cls}" style="transform-origin:${x + 5.5}px 66px">${part(x + 6, 77, 6.6, 14.5, p, c)}${part(x + 8, 91.5, 7.6, 4.2, p, c * .8, { sparse: true })}</g>`;
+}
+function eyes(k, s) {
+  const lid = k === 'panda' ? '#F3EEE6' : '#4A3426';
+  const ring = k === 'teddy' ? '' : `<ellipse cx="85" cy="42.5" rx="5.2" ry="5" fill="${k === 'panda' ? s.dark : s.deep}" opacity="${k === 'panda' ? 1 : .35}"/><ellipse cx="97.5" cy="42" rx="4.4" ry="4.6" fill="${k === 'panda' ? s.dark : s.deep}" opacity="${k === 'panda' ? 1 : .35}"/>`;
+  const iris = k === 'teddy' ? '#120C0A' : '#2A170E';
+  return `${ring}<g class="p-eyes"><circle cx="85" cy="42" r="3.6" fill="${iris}"/><circle cx="85" cy="42" r="3.6" fill="none" stroke="#6B4127" stroke-width=".8" opacity=".8"/><circle cx="86.3" cy="40.6" r="1.25" fill="#fff"/><circle cx="84" cy="43.4" r=".55" fill="#fff" opacity=".7"/>
+  <circle cx="97.5" cy="41.5" r="3.1" fill="${iris}"/><circle cx="97.5" cy="41.5" r="3.1" fill="none" stroke="#6B4127" stroke-width=".7" opacity=".8"/><circle cx="98.6" cy="40.2" r="1.05" fill="#fff"/></g>
+  <g class="p-eyes-closed" fill="none" stroke="${lid}" stroke-width="1.5" stroke-linecap="round"><path d="M81.5 42.5 Q85 45 88.5 42.5"/><path d="M94.5 42 Q97.5 44.2 100.5 42"/></g>`;
+}
+function nose(x, y, s) {
+  return `<ellipse cx="${x}" cy="${y}" rx="3.8" ry="2.9" fill="#1D1513"/><ellipse cx="${x - 1}" cy="${y - 1}" rx="1.4" ry=".8" fill="#fff" opacity=".55"/>`;
+}
+function mouth(x, y) { // little open smile with a tongue
+  return `<path d="M${x} ${y} Q${x - .5} ${y + 3.4} ${x - 4} ${y + 3.6} M${x} ${y} Q${x + .8} ${y + 3} ${x + 3.6} ${y + 3}" fill="none" stroke="#3A2620" stroke-width="1.2" stroke-linecap="round"/>
+    <path d="M${x - 3.2} ${y + 3.8} Q${x - .5} ${y + 2.6} ${x + 2.6} ${y + 3.4} Q${x + 1.6} ${y + 7.6} ${x - .4} ${y + 7.6} Q${x - 2.6} ${y + 7.4} ${x - 3.2} ${y + 3.8}Z" fill="#E8707E"/>`;
+}
+function head(k, s) {
+  const F = palFur(s), c = s.curl;
+  const cheek = `<ellipse cx="79" cy="51.5" rx="4.2" ry="2.6" fill="#FF9AA5" opacity=".28"/>`;
+  if (k === 'morkie') return `
+    ${part(102, 45, 6.5, 13, palEar(s), c * .9, { rot: -14, seed: 1 })}
+    ${part(82, 43, 23.5, 21.5, F, c)}
+    ${part(81, 25, 14, 7, F, c, { seed: 3 })}
+    ${part(97.5, 53, 11.5, 9, palBelly(s), c * .85, { seed: 4 })}
+    ${eyes(k, s)}${cheek}
+    ${mouth(103.5, 52.6)}<g class="p-tongue">${'' }</g>
+    ${nose(103.5, 49.3, s)}
+    ${part(62, 47, 8, 15, palEar(s), c * .9, { rot: 14, seed: 2 })}`;
+  if (k === 'panda') return `
+    ${part(99, 24, 7.5, 7.5, palDark(s), c, { seed: 1 })}
+    ${part(65, 25, 8.5, 8.5, palDark(s), c, { seed: 2 })}
+    ${part(82, 45, 25, 22.5, F, c)}
+    <ellipse cx="85" cy="43.5" rx="6.2" ry="7.8" transform="rotate(-28 85 43.5)" fill="${s.dark}"/>
+    <ellipse cx="97.8" cy="43" rx="4.8" ry="6.6" transform="rotate(-14 97.8 43)" fill="${s.dark}"/>
+    ${part(97.5, 53, 10, 7, palBelly(s), c * .8, { seed: 4, sparse: true })}
+    ${eyes(k, s)}${cheek}
+    ${mouth(102.5, 52.4)}<g class="p-tongue"></g>
+    ${nose(102.5, 49.4, s)}`;
+  return `
+    ${part(99, 23, 8, 8, F, c, { seed: 1 })}<circle cx="99.4" cy="23.6" r="4.3" fill="${s.ear}"/>
+    ${part(64, 26, 9.2, 9.2, F, c, { seed: 2 })}<circle cx="64.6" cy="26.6" r="5" fill="${s.ear}"/>
+    ${part(82, 45, 24.5, 22.5, F, c)}
+    <path d="M82 23 V31" stroke="${s.deep}" stroke-width="1.2" stroke-dasharray="2 2.2" stroke-linecap="round"/>
+    ${part(97.5, 52.5, 10.5, 8, palEar(s), c * .8, { seed: 4 })}
+    ${eyes(k, s)}${cheek}
+    ${mouth(104, 52)}<g class="p-tongue"></g>
+    <path d="M100.5 46.6 Q105 45.2 107.3 47.4 Q105.6 51.6 102.6 51.2 Q99.6 50.2 100.5 46.6Z" fill="#3B2418"/><circle cx="102.5" cy="47.3" r=".9" fill="#fff" opacity=".6"/>`;
+}
+function tail(k, s) {
+  if (k === 'morkie') return `<g class="p-tail" style="transform-origin:31px 64px">${part(27, 54, 8.5, 10, palFur(s), s.curl, { rot: -20, seed: 9 })}</g>`;
+  if (k === 'panda') return `<g class="p-tail" style="transform-origin:28px 64px">${part(27, 63, 5.5, 5, palFur(s), s.curl, { seed: 9 })}</g>`;
+  return `<g class="p-tail" style="transform-origin:28px 64px">${part(27, 63, 5.5, 5.5, { hi: s.fur, base: s.shade, shade: s.deep, deep: s.deep }, s.curl, { seed: 9 })}</g>`;
+}
+function torso(k, s) {
+  const F = palFur(s);
+  if (k === 'morkie') return `${part(53, 71, 27.5, 17.5, F, s.curl)}${part(71, 73, 11, 13, palBelly(s), s.curl, { seed: 5 })}`;
+  if (k === 'panda') return `${part(53, 70, 28, 17.5, F, s.curl)}${part(70, 68, 11.5, 17, palDark(s), s.curl, { seed: 5, rot: 12 })}`;
+  return `${part(53, 70, 28, 17.5, F, s.curl)}<ellipse cx="57" cy="76" rx="14" ry="8" fill="${s.belly}" stroke="${s.deep}" stroke-width="1" stroke-dasharray="2 2"/>`;
+}
+function ballSVG(kind, size) {
+  return `<svg viewBox="0 0 30 30" width="${size}" height="${size}"><defs><radialGradient id="bg-ball" cx="35%" cy="30%" r="75%"><stop offset="0" stop-color="#F0FF8C"/><stop offset="1" stop-color="#A9C93A"/></radialGradient></defs><circle cx="15" cy="15" r="12.5" fill="url(#bg-ball)" stroke="#6E8424" stroke-width="1.2"/><path d="M5 7 Q13 15 5 23 M25 7 Q17 15 25 23" fill="none" stroke="#fff" stroke-width="2.2" stroke-linecap="round" opacity=".9"/></svg>`;
+}
+function petSVG(k) {
+  begin(k);
+  const s = SPECIES[k];
+  const collar = k === 'teddy'
+    ? `<g class="p-collar"><path d="M72 66 L62 60 L63 72Z M72 66 L82 60 L81 72Z" fill="${s.collar}"/><circle cx="72" cy="66.5" r="3.2" fill="${mix(s.collar, '#000000', .15)}"/></g>`
+    : `<g class="p-collar"><path d="M66 57 Q69 66 78 68" fill="none" stroke="${s.collar}" stroke-width="3" stroke-linecap="round"/><circle cx="72" cy="68.5" r="2.6" fill="#F5C842" stroke="#B88A1A" stroke-width=".8"/></g>`;
+  const ballInMouth = `<g class="p-carry"><circle cx="103" cy="60" r="7.5" fill="#CBEA4C" stroke="#6E8424" stroke-width="1"/><path d="M97.5 56 Q101.5 60 97.5 64.5 M108.5 56 Q104.5 60 108.5 64.5" fill="none" stroke="#fff" stroke-width="1.6"/></g>`;
+  return `<svg viewBox="0 -26 124 126" aria-hidden="true">
+  <ellipse class="p-shadow" cx="56" cy="95.5" rx="33" ry="4.5" fill="rgba(42,30,26,.2)"/>
+  <g class="p-all">
+    ${tail(k, s)}
+    ${leg(34, s, 'p-leg-back p-leg-b', false)}${leg(64, s, 'p-leg-front p-leg-b', false)}
+    <g class="p-torso">${torso(k, s)}</g>
+    <g class="p-haunch">${part(50, 92.5, 9, 4, palLeg(s, true), s.curl * .8, { seed: 7 })}${part(41, 80, 13.5, 11.5, palLeg(s, true), s.curl, { seed: 8 })}</g>
+    ${leg(43, s, 'p-leg-back p-leg-a', true)}${leg(73, s, 'p-leg-front p-leg-a', true)}
+    ${collar}
+    <g class="p-head">${head(k, s)}${ballInMouth}
+      <g class="p-alert"><path d="M110 8 L113 22" stroke="${INK}" stroke-width="3.4" stroke-linecap="round"/><circle cx="114.2" cy="27.5" r="2" fill="${INK}"/></g>
+    </g>
+  </g>
+  <g class="p-zzz"><text x="96" y="22">z</text><text x="104" y="10">z</text><text x="112" y="-2">Z</text></g>
+</svg>`;
+}
+function faceSVG(k) { // head only, for the menu and switch buttons
+  begin(k);
+  return `<svg viewBox="52 4 64 68" aria-hidden="true">${head(k, SPECIES[k])}</svg>`;
+}
+function houseSVG(k, name) {
+  begin(k);
+  const s = SPECIES[k];
+  return `<svg viewBox="0 0 190 150" aria-hidden="true">
+  <defs><clipPath id="door-clip"><path d="M64 142 V102 A26 26 0 0 1 116 102 V142Z"/></clipPath></defs>
+  <ellipse cx="92" cy="145" rx="88" ry="5" fill="rgba(42,30,26,.18)"/>
+  <g class="house-art">
+    <g class="house-body">
+      <path d="M26 72 H154 V142 H26Z" fill="var(--wall)" ${o} stroke-width="3"/>
+      <path d="M28 90 H62 M118 90 H152 M28 108 H62 M118 108 H152 M28 126 H62 M118 126 H152" stroke="var(--wall-line)" stroke-width="2.4" stroke-linecap="round"/>
+      <path d="M10 80 L90 14 L170 80 Q170 86 164 85 L90 26 L16 85 Q10 86 10 80Z" fill="var(--roof-dark)" ${o} stroke-width="3"/>
+      <path d="M12 79 L90 15 L168 79" fill="none" stroke="var(--roof)" stroke-width="9" stroke-linecap="round" stroke-linejoin="round"/>
+      <path d="M12 79 L90 15 L168 79" fill="none" ${o} stroke-width="3"/>
+      <rect x="83" y="2" width="14" height="10" rx="3" fill="var(--wood)" ${o} transform="rotate(0)" opacity="0"/>
+      <rect x="56" y="46" width="68" height="20" rx="8" fill="var(--paper)" ${o} stroke-width="2.6"/>
+      <text class="nameplate-text" x="90" y="61" text-anchor="middle">${escapeHTML(name)}</text>
+      <path d="M64 142 V102 A26 26 0 0 1 116 102 V142Z" fill="var(--door)" ${o} stroke-width="3"/>
+      <path d="M58 142 V102 A32 32 0 0 1 122 102 V142" fill="none" stroke="var(--wood)" stroke-width="5"/>
+      <path d="M58 142 V102 A32 32 0 0 1 122 102 V142" fill="none" ${o} stroke-width="1.6" opacity=".55"/>
+      <g clip-path="url(#door-clip)"><g class="peek"><g transform="translate(8 74)"><g class="peek-head">${head(k, s)}</g></g></g></g>
+      <g class="peek-paws"><ellipse cx="80" cy="141" rx="7.5" ry="4.2" fill="${s.dark || s.fur}" ${ol}/><ellipse cx="99" cy="141" rx="7.5" ry="4.2" fill="${s.dark || s.fur}" ${ol}/></g>
+      <path d="M22 142 Q30 132 32 142 Q36 134 40 142 M140 142 Q146 132 149 142 Q152 135 156 142" fill="var(--grass)" ${o} stroke-width="2"/>
+      <rect x="171" y="104" width="9" height="40" rx="3" fill="var(--wood)" ${o} stroke-width="2.6"/>
+      <circle class="post-ring" cx="175.5" cy="111" r="5" fill="none" stroke="#FFCF3F" stroke-width="3"/>
+      <circle cx="175.5" cy="111" r="5" fill="none" ${o} stroke-width="1.2" opacity=".6"/>
+      <path d="M130 140 Q138 128 146 140Z" fill="${s.collar}" ${o} stroke-width="2.2" opacity="0"/>
+    </g>
+    <g class="house-zzz"><text x="118" y="98">z</text><text x="126" y="86">z</text><text x="134" y="74">Z</text></g>
+  </g>
+</svg>`;
+}
+function escapeHTML(t) { return String(t).replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c])); }
+
+// ================= state =================
+const KEY = 'cursor-puppy:v1';
+const saved = (() => { try { return JSON.parse(localStorage.getItem(KEY)) || {}; } catch { return {}; } })();
+const S = {
+  species: SPECIES[saved.species] ? saved.species : 'morkie',
+  name: typeof saved.name === 'string' && saved.name.trim() ? saved.name.trim().slice(0, 14) : null,
+  mode: ['follow', 'ball', 'tied', 'home'].includes(saved.mode) ? saved.mode : 'follow',
+  napMs: Number(saved.napMs) || 15000,
+};
+if (!S.name || OLD_NAMES.includes(S.name)) S.name = SPECIES[S.species].name;
+function loadState() { // another screen's window may have changed it
+  try {
+    const v = JSON.parse(localStorage.getItem(KEY)) || {};
+    if (SPECIES[v.species]) S.species = v.species;
+    if (typeof v.name === 'string' && v.name.trim()) S.name = v.name.trim().slice(0, 14);
+    if (['follow', 'ball', 'tied', 'home'].includes(v.mode)) S.mode = v.mode;
+    if (Number(v.napMs)) S.napMs = Number(v.napMs);
+  } catch {}
+}
+function save() {
+  try { localStorage.setItem(KEY, JSON.stringify({ species: S.species, name: S.name, mode: S.mode, napMs: S.napMs })); } catch {}
+  if (desktop) desktop.report({ species: S.species, name: S.name, mode: S.mode, napMs: S.napMs });
+}
+
+const $ = (id) => document.getElementById(id);
+const petEl = $('pet'), flipEl = $('pet-flip'), houseEl = $('house'), menuEl = $('menu'), ballEl = $('ball'), bubbleEl = $('bubble');
+const leashPath = $('leash-path'), leashHi = $('leash-hi');
+const PW = 120, VB = { x: 0, y: -26, w: 124, h: 126 }, K = PW / VB.w; // px per viewBox unit
+const PH = VB.h * K, FEET = (95.5 - VB.y) * K;
+const COLLAR = { x: 72 * K, y: (68.5 - VB.y) * K };
+
+let W = innerWidth, H = innerHeight;
+const cursor = { x: W * .55, y: H * .5, moved: performance.now(), seen: false };
+const pet = { x: 0, y: 0, face: 1, speed: 0, pose: 'sit', act: 'idle', t: 0, arrived: true };
+const ball = { x: 0, y: 0, z: 0, vx: 0, vy: 0, vz: 0, active: false, held: false, dragging: false, restSince: 0 };
+
+function render() {
+  petEl.style.transform = `translate(${Math.round(pet.x - PW / 2)}px, ${Math.round(pet.y - FEET)}px)`;
+  flipEl.style.transform = `scaleX(${pet.face})`;
+  if (petEl.dataset.pose !== pet.pose) petEl.dataset.pose = pet.pose;
+}
+function draw() {
+  flipEl.innerHTML = petSVG(S.species);
+  petEl.dataset.species = S.species;
+  houseEl.innerHTML = houseSVG(S.species, S.name);
+  $('ball-art').innerHTML = ballSVG(SPECIES[S.species].ball, 30);
+  $('menu-face').innerHTML = faceSVG(S.species);
+  $('menu-name').textContent = S.name;
+  $('call-label').textContent = `Call ${S.name}`;
+  $('name-input').value = S.name;
+  $('picks').innerHTML = Object.keys(SPECIES).map((k) => `<button class="pick" type="button" data-species="${k}" aria-pressed="${k === S.species}">${faceSVG(k)}${SPECIES[k].label}</button>`).join('');
+  updateMenuMode();
+}
+function updateMenuMode() {
+  const nm = S.name;
+  const label = {
+    follow: pet.act === 'nap' ? `${nm} is napping by your cursor` : `Following your cursor`,
+    ball: 'Playing ball',
+    tied: pet.act === 'nap' ? 'Napping in front of home' : 'Tied up in front of home',
+    home: 'Asleep inside the house',
+  }[S.mode];
+  $('menu-mode').textContent = label;
+  menuEl.querySelectorAll('.act').forEach((b) => {
+    const a = b.dataset.act;
+    b.setAttribute('aria-pressed', String((a === 'call' && S.mode === 'follow') || (a === 'ball' && S.mode === 'ball') || (a === 'tie' && S.mode === 'tied') || (a === 'sleep' && S.mode === 'home')));
+  });
+}
+
+// geometry of the house, in screen px
+function houseGeo() {
+  const r = houseEl.getBoundingClientRect(), sx = r.width / 190, sy = r.height / 150;
+  return { r, door: { x: r.left + 90 * sx, y: r.top + 141 * sy }, ring: { x: r.left + 175.5 * sx, y: r.top + 111 * sy }, ground: r.top + 143 * sy };
+}
+
+// ================= talking + effects =================
+let bubbleTimer = 0;
+function say(text, ms = 1600) {
+  bubbleEl.textContent = text;
+  bubbleEl.classList.add('show');
+  clearTimeout(bubbleTimer);
+  bubbleTimer = setTimeout(() => bubbleEl.classList.remove('show'), ms);
+}
+function flash(cls, ms) { petEl.classList.remove(cls); void petEl.offsetWidth; petEl.classList.add(cls); setTimeout(() => petEl.classList.remove(cls), ms); }
+function hearts() {
+  for (let i = 0; i < 4; i++) {
+    const h = document.createElement('div');
+    h.className = 'heart'; h.textContent = '❤';
+    h.style.color = ['#FF5C7A', '#FF8FB6', '#FF7A59', '#E8463F'][i];
+    h.style.left = `${pet.x + (Math.random() * 40 - 20)}px`;
+    h.style.top = `${pet.y - FEET + 20}px`;
+    h.style.setProperty('--dx', `${Math.random() * 50 - 25}px`);
+    h.style.animationDelay = `${i * 90}ms`;
+    $('world').appendChild(h);
+    setTimeout(() => h.remove(), 1300);
+  }
+}
+
+// ================= behaviours =================
+// pet.act: 'out' (leaving the house), 'follow', 'nap', 'chase', 'fetch', 'waitBall', 'toHome', 'enter', 'inside', 'toTie', 'pace', 'idle'
+function setAct(a) { pet.act = a; pet.t = 0; updateMenuMode(); }
+function setMode(m, opts = {}) {
+  const was = S.mode;
+  S.mode = m; save();
+  if (m !== 'ball') { ball.active = false; ball.held = false; ballEl.hidden = true; petEl.dataset.carry = '0'; }
+  if (was === 'home' && pet.act === 'inside') { leaveHouse(m); return; }
+  if (pet.act === 'enter') { leaveHouse(m); return; }
+  startMode(m, opts);
+}
+function startMode(m, opts = {}) {
+  if (m === 'follow') { setAct('follow'); if (!opts.quiet) say(pickCall()); flash('startle', 400); }
+  else if (m === 'ball') startBall();
+  else if (m === 'tied') { setAct('toTie'); say('To the house!'); }
+  else if (m === 'home') { setAct('toHome'); say('Bedtime!'); }
+  updateMenuMode();
+}
+function pickCall() { const n = ['Coming!', 'Here I am!', 'Yay!', SPECIES[S.species].sound]; return n[Math.floor(Math.random() * n.length)]; }
+
+function leaveHouse(nextMode) {
+  houseEl.dataset.peek = 'awake';
+  houseEl.dataset.home = 'out';
+  setAct('out');
+  const g = houseGeo();
+  setTimeout(() => {
+    pet.x = g.door.x; pet.y = g.door.y + 2; pet.face = 1; pet.pose = 'sit';
+    petEl.classList.remove('entering', 'gone');
+    petEl.classList.remove('pop'); void petEl.offsetWidth; petEl.classList.add('pop');
+    render();
+    setTimeout(() => startMode(nextMode), 350);
+  }, 380);
+}
+function goInside() {
+  setAct('enter');
+  pet.pose = 'walk';
+  petEl.classList.add('entering');
+  setTimeout(() => {
+    if (pet.act !== 'enter') return;
+    petEl.classList.add('gone');
+    houseEl.dataset.peek = 'awake';
+    houseEl.dataset.home = 'in';
+    setAct('inside');
+    setTimeout(() => { if (pet.act === 'inside') houseEl.dataset.peek = 'sleep'; }, 1500);
+  }, 460);
+}
+
+function startBall() {
+  ball.active = true; ball.held = true; ballEl.hidden = true;
+  petEl.dataset.carry = '1';
+  setAct('fetch'); // bring the ball to you first
+  say('Ball time!');
+}
+function dropBall() {
+  ball.held = false; petEl.dataset.carry = '0';
+  ball.x = pet.x + pet.face * 38; ball.y = pet.y - 2; ball.z = 18; ball.vx = pet.face * 30; ball.vy = 0; ball.vz = 0;
+  ballEl.hidden = false; ball.restSince = performance.now();
+  setAct('waitBall');
+}
+function throwBall(vx, vy) {
+  if (!ball.active) return;
+  ball.held = false; petEl.dataset.carry = '0'; ballEl.hidden = false;
+  ball.vx = vx; ball.vy = vy; ball.vz = 260 + Math.random() * 120; ball.z = Math.max(ball.z, 6);
+  setAct('chase'); flash('startle', 400);
+}
+function randomThrow(fromX, fromY, power = 750) {
+  // aim roughly away from the nearest walls so it lands somewhere visible
+  const ang = Math.atan2((H / 2 - fromY) + (Math.random() - .5) * H, (W / 2 - fromX) + (Math.random() - .5) * W);
+  throwBall(Math.cos(ang) * power, Math.sin(ang) * power);
+}
+
+function clampX(x) { return Math.min(W - PW / 2 + 6, Math.max(PW / 2 - 6, x)); }
+function clampY(y) { return Math.min(H - 2, Math.max(FEET - 6, y)); }
+
+// walk/run toward (tx,ty); returns remaining distance
+function moveTo(tx, ty, dt, opts = {}) {
+  if (!opts.free) { tx = clampX(tx); ty = clampY(ty); }
+  const dx = tx - pet.x, dy = ty - pet.y, d = Math.hypot(dx, dy);
+  const arrive = opts.arrive ?? 6;
+  if (d <= arrive) { pet.speed = 0; return d; }
+  const run = opts.run ?? d > 230;
+  const top = opts.speed ?? (run ? 380 : 125);
+  pet.speed += (top - pet.speed) * Math.min(1, dt * 6);
+  const step = Math.min(d, pet.speed * dt);
+  pet.x += dx / d * step; pet.y += dy / d * step;
+  if (Math.abs(dx) > 3) pet.face = dx > 0 ? 1 : -1;
+  pet.pose = pet.speed > 230 ? 'run' : 'walk';
+  return d - step;
+}
+function faceToward(x) { if (Math.abs(x - pet.x) > 8) pet.face = x > pet.x ? 1 : -1; }
+
+function cursorIdle(now) { return now - cursor.moved > S.napMs; }
+let napFrom = null;
+function napIfIdle(now, resumeAct) {
+  if (!cursorIdle(now)) return false;
+  napFrom = resumeAct;
+  setAct('drowsy');
+  return true;
+}
+
+function followTarget() {
+  const side = pet.x < cursor.x ? 1 : -1;
+  return { x: cursor.x - side * 56, y: cursor.y + 54 };
+}
+
+let paceTarget = null, paceWait = 0;
+function tieZone() {
+  const g = houseGeo();
+  return { g, x0: g.ring.x - 30, x1: Math.min(W - 60, g.ring.x + 150), y0: g.ground - 34, y1: Math.min(H - 2, g.ground + 2) };
+}
+
+// ---- several screens (desktop app) ----
+// Each screen has its own window running this page. The pet lives in one of them at a time; when
+// you take the cursor to another screen it walks off this one and the app hands it over.
+let role = { primary: true, home: null }; // home: the house door, in this window's coordinates
+let owner = true;                         // is the pet on this screen?
+function cursorOffScreen() { return !!desktop && (cursor.x < 0 || cursor.x >= W || cursor.y < 0 || cursor.y >= H); }
+function leaveTarget() {
+  if (!role.primary && ['home', 'tied'].includes(S.mode) && role.home) return { x: role.home.x, y: role.home.y, why: 'home' };
+  const dx = cursor.x - pet.x, dy = cursor.y + 54 - pet.y, d = Math.hypot(dx, dy) || 1;
+  return { x: cursor.x + dx / d * 160, y: cursor.y + 54 + dy / d * 160, why: 'cursor' };
+}
+function handOff(why) {
+  owner = false;
+  petEl.classList.add('gone'); bubbleEl.classList.remove('show');
+  ballEl.hidden = true;
+  const carry = S.mode === 'ball';
+  setAct('away');
+  desktop.handoff({ x: pet.x, y: pet.y, why, carry });
+}
+function arrive(a) { // the pet walks in from another screen
+  loadState();
+  owner = true; draw();
+  pet.x = a.x; pet.y = a.y; pet.speed = 300; pet.arrived = false;
+  petEl.classList.remove('gone', 'entering');
+  if (S.mode === 'ball') { ball.active = true; ball.held = true; ballEl.hidden = true; petEl.dataset.carry = '1'; setAct('fetch'); }
+  else if (S.mode === 'home') setAct('toHome');
+  else if (S.mode === 'tied') setAct('toTie');
+  else setAct('follow');
+  render();
+}
+
+function update(dt, now) {
+  pet.t += dt;
+  if (desktop && (((pet.act === 'follow' || pet.act === 'fetch') && cursorOffScreen()) || (!role.primary && ['toHome', 'toTie', 'pace'].includes(pet.act)))) setAct('leave');
+  switch (pet.act) {
+    case 'leave': { // walk off the edge toward the other screen
+      const t = leaveTarget();
+      if (t.why === 'cursor' && !cursorOffScreen()) { setAct(ball.held ? 'fetch' : 'follow'); break; }
+      moveTo(t.x, t.y, dt, { free: true, run: true });
+      if (pet.x < -PW / 2 || pet.x > W + PW / 2 || pet.y < 10 || pet.y > H + FEET) handOff(t.why);
+      break;
+    }
+    case 'away': break;
+    case 'follow': {
+      const t = followTarget();
+      const d = Math.hypot(clampX(t.x) - pet.x, clampY(t.y) - pet.y);
+      if (pet.arrived && d < 46) { pet.speed = 0; pet.pose = 'sit'; faceToward(cursor.x); if (napIfIdle(now, 'follow')) break; }
+      else { pet.arrived = moveTo(t.x, t.y, dt) <= 6; if (pet.arrived) pet.pose = 'sit'; }
+      break;
+    }
+    case 'drowsy': // eyes droop for a moment, then lie down
+      pet.pose = 'drowsy';
+      if (!cursorIdle(now)) { setAct(napFrom); break; }
+      if (pet.t > 1.4) { setAct('nap'); }
+      break;
+    case 'nap':
+      pet.pose = 'sleep';
+      if (!cursorIdle(now)) { flash('startle', 420); say(['!', 'Oh! Hi!', '*yawn*'][Math.floor(Math.random() * 3)], 1000); pet.arrived = false; setAct(napFrom || 'follow'); }
+      break;
+    case 'fetch': { // carrying the ball back to you
+      const t = followTarget();
+      if (moveTo(t.x, t.y, dt, { arrive: 10 }) <= 10) { pet.pose = 'sit'; faceToward(cursor.x); dropBall(); say('Throw it!'); }
+      break;
+    }
+    case 'waitBall': {
+      pet.pose = 'sit'; faceToward(ball.x);
+      const idleFor = (now - ball.restSince) / 1000;
+      if (napIfIdle(now, 'waitBall')) break;
+      if (idleFor > 9 && !ball.dragging) { say('I\'ll do it!'); randomThrow(ball.x, ball.y, 420); }
+      break;
+    }
+    case 'chase': {
+      if (ball.held) { setAct('fetch'); break; }
+      const d = moveTo(ball.x - pet.face * 30, ball.y + 2, dt, { arrive: 8, run: true });
+      if (d <= 14 && ball.z < 10 && !ball.dragging) { ball.held = true; ballEl.hidden = true; petEl.dataset.carry = '1'; setAct('fetch'); }
+      break;
+    }
+    case 'toHome': {
+      const g = houseGeo();
+      if (moveTo(g.door.x, g.door.y + 2, dt, { arrive: 4 }) <= 4) goInside();
+      break;
+    }
+    case 'toTie': {
+      const z = tieZone();
+      if (moveTo(z.g.ring.x + 50, z.y1 - 6, dt, { arrive: 8 }) <= 8) { setAct('pace'); paceTarget = null; paceWait = 1.2; say('I\'ll guard it!'); }
+      break;
+    }
+    case 'pace': { // wander back and forth in front of the house, on the leash
+      const z = tieZone();
+      if (napIfIdle(now, 'pace')) break;
+      if (!paceTarget) {
+        paceWait -= dt; pet.pose = 'sit';
+        if (Math.random() < .004) faceToward(cursor.x);
+        if (paceWait <= 0) paceTarget = { x: z.x0 + Math.random() * (z.x1 - z.x0), y: z.y0 + Math.random() * (z.y1 - z.y0) };
+      } else if (moveTo(paceTarget.x, paceTarget.y, dt, { speed: 95, run: false }) <= 6) {
+        paceTarget = null; paceWait = .8 + Math.random() * 2.4; pet.pose = 'sit';
+      }
+      break;
+    }
+    case 'idle': pet.pose = 'sit'; break;
+  }
+  updateBall(dt, now);
+}
+
+function updateBall(dt, now) {
+  if (!ball.active || ball.held || ball.dragging) return;
+  const moving = Math.abs(ball.vx) + Math.abs(ball.vy) > 4 || ball.z > .5 || Math.abs(ball.vz) > 1;
+  if (!moving) return;
+  ball.x += ball.vx * dt; ball.y += ball.vy * dt;
+  ball.vz -= 1400 * dt; ball.z += ball.vz * dt;
+  if (ball.z <= 0) { ball.z = 0; ball.vz = Math.abs(ball.vz) > 90 ? -ball.vz * .55 : 0; }
+  const fr = ball.z > 0 ? .995 : .965;
+  ball.vx *= Math.pow(fr, dt * 60); ball.vy *= Math.pow(fr, dt * 60);
+  if (ball.x < 16) { ball.x = 16; ball.vx = Math.abs(ball.vx) * .7; }
+  if (ball.x > W - 16) { ball.x = W - 16; ball.vx = -Math.abs(ball.vx) * .7; }
+  if (ball.y < 40) { ball.y = 40; ball.vy = Math.abs(ball.vy) * .7; }
+  if (ball.y > H - 4) { ball.y = H - 4; ball.vy = -Math.abs(ball.vy) * .7; }
+  ball.restSince = now;
+}
+function renderBall() {
+  if (!ball.active || ball.held) return;
+  ballEl.style.transform = `translate(${Math.round(ball.x - 15)}px, ${Math.round(ball.y - 30)}px)`;
+  ballEl.querySelector('.b').style.transform = `translateY(${-ball.z}px) rotate(${(ball.x * 3) % 360}deg)`;
+  ballEl.style.zIndex = ball.y > pet.y ? 6 : 4;
+}
+function renderLeash() {
+  const tied = S.mode === 'tied' && ['pace', 'nap', 'drowsy'].includes(pet.act);
+  if (!tied) { leashPath.setAttribute('d', ''); leashHi.setAttribute('d', ''); return; }
+  const g = houseGeo();
+  const cx = pet.x - PW / 2 + (pet.face === 1 ? COLLAR.x : PW - COLLAR.x);
+  const cy = pet.y - FEET + COLLAR.y + (pet.pose === 'sleep' ? 14 : 0);
+  const mx = (g.ring.x + cx) / 2, my = Math.max(g.ring.y, cy) + 26;
+  const d = `M${g.ring.x} ${g.ring.y} Q${mx} ${my} ${cx} ${cy}`;
+  leashPath.setAttribute('d', d); leashHi.setAttribute('d', d);
+}
+
+// ================= input =================
+function onCursor(x, y) {
+  const now = performance.now();
+  if (!cursor.seen || Math.hypot(x - cursor.x, y - cursor.y) > 2) cursor.moved = now;
+  cursor.x = x; cursor.y = y; cursor.seen = true;
+  if (desktop) updateClickThrough(x, y);
+  maybeCloseMenu(x, y);
+}
+let interactive = false;
+function updateClickThrough(x, y) {
+  const el = document.elementFromPoint(x, y);
+  const on = !!(el && el.closest('.hit, .p-all')) || ball.dragging || renaming;
+  if (on !== interactive) { interactive = on; desktop.setInteractive(on); }
+}
+if (desktop) desktop.onCursor((p) => onCursor(p.x, p.y));
+else addEventListener('pointermove', (e) => onCursor(e.clientX, e.clientY), { passive: true });
+
+// pet: click for hearts
+petEl.addEventListener('pointerdown', (e) => {
+  if (!e.target.closest('.p-all')) return;
+  e.preventDefault();
+  hearts(); say(SPECIES[S.species].sound, 1100); flash('happy', 1000);
+  if (pet.act === 'nap' || pet.act === 'drowsy') { cursor.moved = performance.now(); }
+});
+
+// house: open / close the menu
+function openMenu(open) {
+  menuEl.hidden = !open;
+  houseEl.setAttribute('aria-expanded', String(open));
+  if (open) { draw(); houseEl.classList.remove('boop'); void houseEl.offsetWidth; houseEl.classList.add('boop'); }
+  else if (renaming) { $('name-input').blur(); }
+}
+houseEl.addEventListener('click', (e) => { e.stopPropagation(); openMenu(menuEl.hidden); });
+houseEl.addEventListener('keydown', (e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); openMenu(menuEl.hidden); } });
+addEventListener('pointerdown', (e) => { if (!menuEl.hidden && !e.target.closest('#menu, #house')) openMenu(false); });
+addEventListener('keydown', (e) => { if (e.key === 'Escape') openMenu(false); });
+let farSince = 0;
+function maybeCloseMenu(x, y) { // on the desktop you can't click "outside", so wandering far away closes it
+  if (menuEl.hidden || renaming) { farSince = 0; return; }
+  const m = menuEl.getBoundingClientRect(), h = houseEl.getBoundingClientRect();
+  const near = x > Math.min(m.left, h.left) - 140 && x < Math.max(m.right, h.right) + 140 && y > m.top - 140;
+  if (near) farSince = 0; else if (!farSince) farSince = performance.now(); else if (performance.now() - farSince > 900) openMenu(false);
+}
+
+menuEl.addEventListener('click', (e) => {
+  const act = e.target.closest('.act');
+  const pick = e.target.closest('.pick');
+  if (act) { doAction(act.dataset.act); openMenu(false); }
+  if (pick) switchPet(pick.dataset.species);
+});
+function doAction(a) {
+  if (desktop && !owner) { desktop.forward({ type: 'act', value: a }); return; }
+  if (a === 'call') setMode('follow');
+  if (a === 'ball') setMode('ball');
+  if (a === 'tie') setMode('tied');
+  if (a === 'sleep') { if (S.mode !== 'home' || pet.act !== 'inside') setMode('home'); }
+}
+function switchPet(k) {
+  if (!SPECIES[k] || k === S.species) return;
+  if (S.name === SPECIES[S.species].name) S.name = SPECIES[k].name; // keep custom names
+  S.species = k; save(); draw();
+  if (pet.act === 'inside') { houseEl.dataset.home = 'in'; houseEl.dataset.peek = 'sleep'; }
+  if (!owner) return;
+  petEl.classList.remove('pop'); void petEl.offsetWidth; petEl.classList.add('pop');
+  if (pet.act !== 'inside') say(`Hi, I'm ${S.name}!`);
+}
+let renaming = false;
+const nameInput = $('name-input');
+nameInput.addEventListener('focus', () => { renaming = true; if (desktop) { interactive = true; desktop.setInteractive(true); desktop.wantFocus(true); } });
+nameInput.addEventListener('blur', () => { renaming = false; if (desktop) desktop.wantFocus(false); });
+$('rename').addEventListener('submit', (e) => {
+  e.preventDefault();
+  const n = nameInput.value.trim().slice(0, 14);
+  if (n) { S.name = n; save(); draw(); if (pet.act !== 'inside') say(`I'm ${n}!`); }
+  nameInput.blur(); openMenu(false);
+});
+
+// ball: click to throw, or drag and fling
+let samples = [];
+ballEl.addEventListener('pointerdown', (e) => {
+  e.preventDefault(); ballEl.setPointerCapture(e.pointerId);
+  ball.dragging = true; ball.vx = ball.vy = ball.vz = 0; ball.z = 0;
+  samples = [{ x: e.clientX, y: e.clientY, t: performance.now() }];
+  ballEl.style.cursor = 'grabbing';
+  if (pet.act === 'chase') setAct('waitBall');
+});
+ballEl.addEventListener('pointermove', (e) => {
+  if (!ball.dragging) return;
+  ball.x = e.clientX; ball.y = e.clientY + 15; renderBall();
+  samples.push({ x: e.clientX, y: e.clientY, t: performance.now() });
+  samples = samples.filter((s) => performance.now() - s.t < 90);
+});
+ballEl.addEventListener('pointerup', () => {
+  if (!ball.dragging) return;
+  ball.dragging = false; ballEl.style.cursor = '';
+  const a = samples[0], b = samples[samples.length - 1], dtS = Math.max(.016, (b.t - a.t) / 1000);
+  const vx = (b.x - a.x) / dtS, vy = (b.y - a.y) / dtS, sp = Math.hypot(vx, vy);
+  if (sp > 250) { const k = Math.min(1, 1400 / sp); throwBall(vx * k, vy * k); }
+  else randomThrow(ball.x, ball.y);
+});
+
+// demo tips
+if (!desktop) {
+  const napSel = $('nap-select');
+  napSel.value = String(S.napMs); if (!napSel.value) napSel.value = '15000';
+  napSel.addEventListener('change', () => { S.napMs = Number(napSel.value); save(); cursor.moved = performance.now(); });
+  $('tips-toggle').addEventListener('click', () => {
+    const t = $('tips'); t.classList.toggle('min');
+    $('tips-toggle').textContent = t.classList.contains('min') ? 'Show tips' : 'Hide tips';
+  });
+}
+
+// desktop: Dock menu actions
+if (desktop) desktop.onAction((a) => {
+  if (a.type === 'act') doAction(a.value);
+  if (a.type === 'species') switchPet(a.value);
+  if (a.type === 'nap') { S.napMs = a.value; save(); }
+  if (a.type === 'rename') { openMenu(true); setTimeout(() => { nameInput.focus(); nameInput.select(); }, 60); }
+});
+
+if (desktop) {
+  desktop.onArrive(arrive);
+  desktop.onSync((v) => {
+    const redraw = v.species !== S.species || v.name !== S.name;
+    Object.assign(S, { species: v.species, name: v.name, mode: v.mode, napMs: v.napMs });
+    if (redraw) draw();
+    if (role.primary && !owner) { houseEl.dataset.home = 'out'; }
+  });
+}
+
+// ================= loop =================
+function resize() { W = innerWidth; H = innerHeight; }
+addEventListener('resize', resize);
+let last = performance.now();
+function frame(now) {
+  const dt = Math.min(.05, (now - last) / 1000); last = now;
+  if (owner) {
+    update(dt, now);
+    if (pet.act !== 'inside') render();
+    renderBall();
+  }
+  renderLeash();
+  requestAnimationFrame(frame);
+}
+
+function boot(r) {
+  role = { ...role, ...r };
+  draw();
+  if (!role.primary) { // another screen: no house here, and the pet starts at home on the main screen
+    owner = false; houseEl.hidden = true; menuEl.hidden = true;
+    petEl.classList.add('gone'); setAct('away');
+  } else { // first appearance: home if they were left asleep, otherwise trot out of the house
+    const g = houseGeo();
+    pet.x = g.door.x; pet.y = g.door.y + 2;
+    if (S.mode === 'home') { petEl.classList.add('gone'); houseEl.dataset.home = 'in'; houseEl.dataset.peek = 'sleep'; setAct('inside'); }
+    else { houseEl.dataset.home = 'in'; houseEl.dataset.peek = 'awake'; petEl.classList.add('gone'); setAct('inside'); setTimeout(() => leaveHouse(S.mode), 700); }
+    save();
+  }
+  requestAnimationFrame(frame);
+}
+window.cursorPuppy = { petSVG, faceSVG, SPECIES, S, pet, ball, cursor, setMode, switchPet, openMenu, get owner() { return owner; }, get role() { return role; } };
+if (desktop) desktop.onSetup(boot); else boot({ primary: true });
+})();
+</script>
